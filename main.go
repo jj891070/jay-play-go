@@ -1,35 +1,22 @@
 package main
 
-import "fmt"
-
-type Blockchain struct {
-	blocks []*Block
-}
-
-func (bc *Blockchain) AddBlock(data string) {
-	prevBlock := bc.blocks[len(bc.blocks)-1]
-	newBlock := NewBlock(data, prevBlock.Hash)
-	bc.blocks = append(bc.blocks, newBlock)
-}
-
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
-}
-
-func NewBlockchain() *Blockchain {
-	return &Blockchain{[]*Block{NewGenesisBlock()}}
-}
+import (
+	"bytes"
+	"fmt"
+)
 
 func main() {
-	bc := NewBlockchain()
+	hello := "hello"
+	helloBytes := []byte(hello)
+	fmt.Println(helloBytes)
 
-	bc.AddBlock("Send 1 BTC to Ivan")
-	bc.AddBlock("Send 2 more BTC to Ivan")
+	world := "world"
+	worldBytes := []byte(world)
+	fmt.Println(worldBytes)
 
-	for _, block := range bc.blocks {
-		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
-		fmt.Printf("Data: %s\n", block.Data)
-		fmt.Printf("Hash: %x\n", block.Hash)
-		fmt.Println()
-	}
+	helloWord := [][]byte{helloBytes, worldBytes}
+	fmt.Println(helloWord)
+
+	helloWords := bytes.Join(helloWord, []byte{})
+	fmt.Println(helloWords)
 }
