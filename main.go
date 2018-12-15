@@ -1,54 +1,108 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"fmt"
-	"strings"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/labstack/gommon/log"
 )
 
-var way map[int]string
+var serverClose chan os.Signal
 
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
-
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
-	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
+// GracefulDown 優雅結束程式
+func GracefulDown() <-chan os.Signal {
+	return serverClose
 }
 
 func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
 
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+	tellParentMessage := make(chan int, 1)
+	// 設定伺服器路由
+	r := SetUpRoute()
+
+	server := SetServerConf(r, ":8098")
+
+	go func() {
+		// 绑定端口，然后启动应用
+		err := ServerRun(server)
+		if err != nil {
+			fmt.Println("server error ---> ", err)
+		}
+		tellParentMessage <- 2
+	}()
+
+	go func() {
+		serverClose = make(chan os.Signal, 1)
+		signal.Notify(serverClose, os.Interrupt, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM)
+
+		s := <-GracefulDown()
+		switch s {
+		case os.Interrupt:
+			log.Infof("SIGSTOP")
+			tellParentMessage <- 1
+			return
+		case syscall.SIGTERM:
+			log.Infof("SIGSTOP")
+			tellParentMessage <- 1
+			return
+		case syscall.SIGINT:
+			log.Infof("SIGHUP")
+			tellParentMessage <- 1
+			return
+		case syscall.SIGKILL:
+			log.Infof("SIGKILL")
+			tellParentMessage <- 1
+			return
+		default:
+			log.Infof("default")
+			tellParentMessage <- 1
+			return
+		}
+
+	}()
+
+	var force bool
+	for {
+		p := <-tellParentMessage
+		switch p {
+		case 1:
+			fmt.Println("來自使用者")
+			force = true
+		case 2:
+			fmt.Println("來自伺服器")
+		default:
+			fmt.Println("無名")
+		}
+		if force {
+			break
+		}
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatal("Server Shutdown:", err)
+	}
+	fmt.Println("Server exiting")
+
+}
+
+// SetServerConf 設定伺服器conf
+func SetServerConf(router *gin.Engine, port string) (srv *http.Server) {
+	srv = &http.Server{
+		Addr:    port,
+		Handler: router,
+	}
+	return
+}
+
+// ServerRun 跑起伺服器
+func ServerRun(serverConf *http.Server) (err error) {
+	err = serverConf.ListenAndServe()
+	return
 }
