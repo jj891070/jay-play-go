@@ -1,54 +1,49 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"fmt"
-	"strings"
+	"math/rand"
 	"time"
 )
 
-var way map[int]string
-
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
-
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
+func work(stop *bool) error {
+	r := rand.New(rand.NewSource(int64(time.Now().Second())))
+	for !*stop {
+		if r.Int()%10 >= 9 {
+			break
 		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	fmt.Println("work done")
+	return nil
+}
 
+func doWork(ctx context.Context) error {
+	c := make(chan error, 1)
+	stop := false
+	go func() { c <- work(&stop) }()
+	select {
+	case <-ctx.Done():
+		stop = true
+		<-c //wait for work
+		return ctx.Err()
+	case err := <-c:
+		return err
 	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
 }
 
 func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
-
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+	timeout := 1 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	go func() {
+		nouse := false
+		work(&nouse)
+		cancel()
+	}()
+	err := doWork(ctx)
+	if err != nil {
+		fmt.Println(err)
 	}
+
 }
