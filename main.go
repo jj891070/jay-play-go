@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"time"
 )
 
 // GetURL 取得URL
@@ -45,8 +46,34 @@ func GetOutRestrictTime() float64 {
 	s, err := strconv.ParseFloat(outTime, 64)
 	if err != nil {
 		log.Println(" ☠  Parse error ----> ", err)
+		return 0.0
 	}
 	return s
+}
+
+// GetDurationTime 取得延遲多久curl一次
+func GetDurationTime() int64 {
+	durationTime := os.Getenv("DURATION_TIME")
+	if durationTime == "" {
+		return 0
+	}
+
+	n, err := strconv.ParseInt(durationTime, 10, 64)
+	if err != nil {
+		log.Println(" ☠  Parse error ----> ", err)
+		return 0
+	}
+	return n
+}
+
+// GetPostData 取得延遲多久curl一次
+func GetPostData() string {
+	postData := os.Getenv("POST_DATA")
+	if postData == "" {
+		return postData
+	}
+
+	return postData
 }
 
 func main() {
@@ -60,10 +87,29 @@ func main() {
 	messageOut := GetOutPutMessage()
 	// 當時間大於幾秒（second）的時候輸出
 	outTime := GetOutRestrictTime()
+	// 延遲多久curl一次
+	durationTime := GetDurationTime()
+	// 取得要發curl的資料
+	postData := GetPostData()
 
-	if messageOut {
-		cmd = exec.Command("curl", wantCurlURL, "-w", `
-			{
+	var curlGrammar []string
+	curlGrammar = append(curlGrammar, wantCurlURL)
+
+	if !messageOut {
+		curlGrammar = append(curlGrammar, "-s")
+		curlGrammar = append(curlGrammar, "-o")
+		curlGrammar = append(curlGrammar, "/dev/null")
+	}
+
+	if postData != "" {
+		curlGrammar = append(curlGrammar, "-X")
+		curlGrammar = append(curlGrammar, "POST")
+		curlGrammar = append(curlGrammar, "-d")
+		curlGrammar = append(curlGrammar, postData)
+	}
+
+	curlGrammar = append(curlGrammar, "-w")
+	curlGrammar = append(curlGrammar, `{
 				"size_download": %{size_download},
 				"speed_download": %{speed_download},
 				"time_namelookup": %{time_namelookup},
@@ -73,58 +119,45 @@ func main() {
 				"time_redirect": %{time_redirect},
 				"time_starttransfer": %{time_starttransfer},
 				"time_total": %{time_total}
-			}`,
-		)
-	} else {
-		cmd = exec.Command("curl", wantCurlURL, "-w", `
-			{
-				"size_download": %{size_download},
-				"speed_download": %{speed_download},
-				"time_namelookup": %{time_namelookup},
-				"time_connect": %{time_connect},
-				"time_appconnect": %{time_appconnect},
-				"time_pretransfer": %{time_pretransfer},
-				"time_redirect": %{time_redirect},
-				"time_starttransfer": %{time_starttransfer},
-				"time_total": %{time_total}
-			}
-			`,
-			"-s", "-f", "-o", "/dev/null",
-		)
-	}
-
-	stdout := bytes.NewBuffer([]byte{})
-	stderr := bytes.NewBuffer([]byte{})
-	cmd.Stderr = stderr
-	cmd.Stdout = stdout
-
-	err := cmd.Run()
-	if err != nil {
-		log.Println(" ☠  Err ==> ", stderr.String())
-		log.Println(" ☠  Run Error => ", err)
-	}
-	// log.Println("Out ==> ", stdout.String())
-
+			}`)
 	data := map[string]float64{}
-	err = json.Unmarshal(stdout.Bytes(), &data)
-	if err != nil {
-		log.Println("JSON Error => ", err)
-	}
+	for {
 
-	total := data["time_total"]
-	nameLookup := data["time_namelookup"]
-	tcpConnect := data["time_pretransfer"] - data["time_namelookup"]
-	sslConnect := data["time_appconnect"]
-	preTransfer := data["time_pretransfer"] - data["time_appconnect"]
-	if data["time_appconnect"] == 0 {
-		sslConnect = 0
-		preTransfer = data["time_pretransfer"] - data["time_connect"]
-	}
-	redirect := data["time_redirect"]
-	serverHandle := data["time_starttransfer"] - data["time_pretransfer"]
-	returnTime := data["time_total"] - data["time_starttransfer"]
-	if outTime != 0 && total > outTime {
-		log.Printf(`
+		cmd = exec.Command("curl", curlGrammar...)
+
+		stdout := bytes.NewBuffer([]byte{})
+		stderr := bytes.NewBuffer([]byte{})
+		cmd.Stderr = stderr
+		cmd.Stdout = stdout
+
+		err := cmd.Run()
+		if err != nil {
+			log.Println(" ☠  Stderr Err ==> ", stderr.String())
+			log.Println(" ☠  Curl Command Excute Error => ", err)
+			return
+		}
+		// log.Println("Out ==> ", stdout.String())
+
+		err = json.Unmarshal(stdout.Bytes(), &data)
+		if err != nil {
+			log.Println("JSON Error => ", err)
+			return
+		}
+
+		total := data["time_total"]
+		nameLookup := data["time_namelookup"]
+		tcpConnect := data["time_pretransfer"] - data["time_namelookup"]
+		sslConnect := data["time_appconnect"]
+		preTransfer := data["time_pretransfer"] - data["time_appconnect"]
+		if data["time_appconnect"] == 0 {
+			sslConnect = 0
+			preTransfer = data["time_pretransfer"] - data["time_connect"]
+		}
+		redirect := data["time_redirect"]
+		serverHandle := data["time_starttransfer"] - data["time_pretransfer"]
+		returnTime := data["time_total"] - data["time_starttransfer"]
+		if outTime != 0 && total > outTime {
+			log.Printf(`
 		🍾 總時間 %f
 			-> 解析網址 %f (%.3f％)
 			-> TCP握手 %f (%.3f％)
@@ -134,20 +167,19 @@ func main() {
 			-> Server處理時間 %f (%.3f％)
 			-> 內容傳輸時間 %f (%.3f％)
 	`,
-			total,
-			nameLookup, nameLookup/total*100,
-			tcpConnect, tcpConnect/total*100,
-			sslConnect, sslConnect/total*100,
-			preTransfer, preTransfer/total*100,
-			redirect, redirect/total*100,
-			serverHandle, serverHandle/total*100,
-			returnTime, returnTime/total*100,
-		)
-		return
-	}
+				total,
+				nameLookup, nameLookup/total*100,
+				tcpConnect, tcpConnect/total*100,
+				sslConnect, sslConnect/total*100,
+				preTransfer, preTransfer/total*100,
+				redirect, redirect/total*100,
+				serverHandle, serverHandle/total*100,
+				returnTime, returnTime/total*100,
+			)
+		}
 
-	if outTime == 0 {
-		log.Printf(`
+		if outTime == 0 {
+			log.Printf(`
 		🌞 總時間 %f
 			-> 解析網址 %f (%.3f％)
 			-> TCP握手 %f (%.3f％)
@@ -157,16 +189,17 @@ func main() {
 			-> Server處理時間 %f (%.3f％)
 			-> 內容傳輸時間 %f (%.3f％)
 	`,
-			total,
-			nameLookup, nameLookup/total*100,
-			tcpConnect, tcpConnect/total*100,
-			sslConnect, sslConnect/total*100,
-			preTransfer, preTransfer/total*100,
-			redirect, redirect/total*100,
-			serverHandle, serverHandle/total*100,
-			returnTime, returnTime/total*100,
-		)
-		return
+				total,
+				nameLookup, nameLookup/total*100,
+				tcpConnect, tcpConnect/total*100,
+				sslConnect, sslConnect/total*100,
+				preTransfer, preTransfer/total*100,
+				redirect, redirect/total*100,
+				serverHandle, serverHandle/total*100,
+				returnTime, returnTime/total*100,
+			)
+		}
+		time.Sleep(time.Duration(durationTime) * time.Second)
 	}
 
 }
