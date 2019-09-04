@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -98,7 +99,7 @@ func main() {
 	if !messageOut {
 		curlGrammar = append(curlGrammar, "-s")
 		curlGrammar = append(curlGrammar, "-o")
-		curlGrammar = append(curlGrammar, "/dev/null")
+		curlGrammar = append(curlGrammar, `/dev/null`)
 	}
 
 	if postData != "" {
@@ -109,7 +110,7 @@ func main() {
 	}
 
 	curlGrammar = append(curlGrammar, "-w")
-	curlGrammar = append(curlGrammar, `{
+	curlGrammar = append(curlGrammar, `####{
 				"size_download": %{size_download},
 				"speed_download": %{speed_download},
 				"time_namelookup": %{time_namelookup},
@@ -122,7 +123,6 @@ func main() {
 			}`)
 	data := map[string]float64{}
 	for {
-
 		cmd = exec.Command("curl", curlGrammar...)
 
 		stdout := bytes.NewBuffer([]byte{})
@@ -137,8 +137,13 @@ func main() {
 			return
 		}
 		// log.Println("Out ==> ", stdout.String())
+		// log.Println(stdout.String())
+		tmpStdout := strings.Split(stdout.String(), "####")
+		if messageOut {
+			log.Println(tmpStdout[0])
+		}
 
-		err = json.Unmarshal(stdout.Bytes(), &data)
+		err = json.Unmarshal([]byte(tmpStdout[1]), &data)
 		if err != nil {
 			log.Println("JSON Error => ", err)
 			return
