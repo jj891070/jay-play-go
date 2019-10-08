@@ -4,78 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
-	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 )
-
-// GetURL 取得URL
-func GetURL() string {
-	url := os.Getenv("WANT_TO_CURL_URL")
-
-	if url == "" {
-		url = "https://www.google.com/"
-	}
-
-	return url
-}
-
-// GetOutPutMessage 取得輸出訊息
-func GetOutPutMessage() bool {
-	messageOut := os.Getenv("MESSAGE_OUT")
-	if messageOut == "" {
-		return false
-	}
-
-	v, err := strconv.ParseBool(messageOut)
-	if err != nil {
-		log.Println(" ☠  Parse error ----> ", err)
-	}
-
-	return v
-}
-
-// GetOutRestrictTime 取得限制大於多少秒在輸出訊息
-func GetOutRestrictTime() float64 {
-	outTime := os.Getenv("RESTRICT_TIME")
-	if outTime == "" {
-		return 0.0
-	}
-
-	s, err := strconv.ParseFloat(outTime, 64)
-	if err != nil {
-		log.Println(" ☠  Parse error ----> ", err)
-		return 0.0
-	}
-	return s
-}
-
-// GetDurationTime 取得延遲多久curl一次
-func GetDurationTime() int64 {
-	durationTime := os.Getenv("DURATION_TIME")
-	if durationTime == "" {
-		return 0
-	}
-
-	n, err := strconv.ParseInt(durationTime, 10, 64)
-	if err != nil {
-		log.Println(" ☠  Parse error ----> ", err)
-		return 0
-	}
-	return n
-}
-
-// GetPostData 取得延遲多久curl一次
-func GetPostData() string {
-	postData := os.Getenv("POST_DATA")
-	if postData == "" {
-		return postData
-	}
-
-	return postData
-}
 
 func main() {
 
@@ -92,14 +24,36 @@ func main() {
 	durationTime := GetDurationTime()
 	// 取得要發curl的資料
 	postData := GetPostData()
+	// 取得要帶的headers
+	withHeaders := GetHeaders()
+	// 是否要忽略https
+	turnOffSsl := GetSslSwitch()
+	// 取得status code
+	turnOnStatusCode := GetStatusCode()
 
 	var curlGrammar []string
 	curlGrammar = append(curlGrammar, wantCurlURL)
+
+	if turnOffSsl {
+		curlGrammar = append(curlGrammar, "-k")
+	}
+
+	if turnOnStatusCode {
+		curlGrammar = append(curlGrammar, "-i")
+	}
 
 	if !messageOut {
 		curlGrammar = append(curlGrammar, "-s")
 		curlGrammar = append(curlGrammar, "-o")
 		curlGrammar = append(curlGrammar, `/dev/null`)
+	}
+
+	if withHeaders != "" {
+		tmp := strings.Split(withHeaders, ",")
+		for _, tmpValue := range tmp {
+			curlGrammar = append(curlGrammar, "-H")
+			curlGrammar = append(curlGrammar, tmpValue)
+		}
 	}
 
 	if postData != "" {
