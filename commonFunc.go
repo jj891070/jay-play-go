@@ -6,6 +6,20 @@ import (
 	"strconv"
 )
 
+// 對應的shell
+var shellCommand = map[string]string{
+	"nc":   "nc",
+	"curl": "curl",
+}
+
+// GetShellCommand 取得shell的指令
+func GetShellCommand(mode string) string {
+	if _, ok := shellCommand[mode]; ok {
+		return shellCommand[mode]
+	}
+	return "not provide this service"
+}
+
 // GetURL 取得URL
 func GetURL() string {
 	url := os.Getenv("WANT_TO_CURL_URL")
@@ -108,4 +122,13 @@ func GetHeaders() string {
 	}
 
 	return withHeaders
+}
+
+// GetMode 取得模式
+func GetMode() string {
+	mode := os.Getenv("CONNECT_MODE")
+	if mode == "" {
+		return "curl"
+	}
+	return mode
 }
