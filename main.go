@@ -1,54 +1,65 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
+	"sync"
 	"time"
 )
 
-var way map[int]string
-
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
-
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
-	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
-}
-
 func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
+	var (
+		wg  sync.WaitGroup
+		jay int64
+		l   *sync.Mutex
+	)
+	// 同步鎖
+	l = new(sync.Mutex)
 
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
-	}
+	// 每１秒鐘做一次
+	t := time.NewTicker(1 * time.Second)
+	defer t.Stop()
+
+	// 通知結束的channel
+	c := make(chan int)
+
+	// 共同資料，一個讀一個寫
+	jay = 56
+
+	// 工人一
+	wg.Add(1)
+	go func(wg *sync.WaitGroup, c *chan int, jay *int64) {
+	ForEnd:
+		for {
+
+			select {
+
+			case <-t.C:
+				fmt.Println(time.Now())
+			case <-*c:
+				fmt.Println("break")
+				break ForEnd
+			default:
+				fmt.Println("I'm start!!!!!!!!!!!!!!!!! ---> ", *jay)
+				time.Sleep(10 * time.Second)
+				fmt.Println("I'm default!!!!!!!!!!!!!!!!!----> ", *jay)
+			}
+		}
+		fmt.Println("bye")
+		wg.Done()
+	}(&wg, &c, &jay)
+
+	// 工人二
+	wg.Add(1)
+	go func(wg *sync.WaitGroup, c *chan int, jay *int64, l *sync.Mutex) {
+
+		time.Sleep(10 * time.Second)
+		*c <- 1
+		wg.Done()
+	}(&wg, &c, &jay, l)
+
+	wg.Wait()
+	fmt.Println("all the tasks done＠＠＠")
+
+	time.Sleep(10 * time.Second)
+	fmt.Println("all the tasks done...")
 }
