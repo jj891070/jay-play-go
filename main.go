@@ -3,52 +3,96 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"strings"
-	"time"
+	"log"
+	"math"
+	"strconv"
 )
 
-var way map[int]string
+func main() {
 
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
+	log.Println(fractionToDecimal(6, 3))
+	log.Println(TurnToFraction(0))
+	x, y := TurnToFraction(0)
+	log.Println(Gcd(int(x), int(y)))
 
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
-	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
 }
 
-func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
-
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+// Gcd 輾轉相除法，取最大公因數
+func Gcd(x, y int) int {
+	tmp := x % y
+	if tmp > 0 {
+		return Gcd(y, tmp)
+	} else {
+		return y
 	}
+}
+
+// TurnToFraction 將小數轉成分子(numerator)／分母(numerator)
+func TurnToFraction(target float64) (numerator float64, denominator float64) {
+	numerator = target
+	denominator = 1
+	for {
+		targetInteger := int(numerator)
+		ans := numerator - float64(targetInteger)
+		if ans == 0 {
+			break
+		}
+		numerator *= 10
+		denominator *= 10
+	}
+	return
+}
+
+// fractionToDecimal 擷取循環小數
+func fractionToDecimal(numerator int, denominator int) string {
+	if numerator == 0 {
+		return "0"
+	}
+	if denominator == 0 {
+		return "NaN"
+	}
+
+	// 判斷分子或分母小於0，加個負號
+	var buffer bytes.Buffer
+	if (numerator < 0 && denominator > 0) || (numerator > 0 && denominator < 0) {
+		buffer.WriteString("-")
+	}
+
+	num := int(math.Abs(float64(numerator)))
+	denom := int(math.Abs(float64(denominator)))
+
+	buffer.WriteString(strconv.Itoa(num / denom))
+
+	num %= denom
+
+	if num == 0 {
+		return buffer.String()
+	}
+	buffer.WriteString(".")
+	log.Println(buffer.String())
+
+	m := make(map[int]int, 10)
+	repeatPos := -1
+	for {
+		num *= 10
+		pos, ok := m[num]
+		if !ok {
+			m[num] = buffer.Len()
+		} else {
+			repeatPos = pos
+			break
+		}
+		buffer.WriteString(strconv.Itoa(num / denom))
+		//fmt.Println(buffer, len(buffer), num)
+		num %= denom
+		if num == 0 {
+			break
+		}
+	}
+
+	if repeatPos == -1 {
+		return buffer.String()
+	}
+	res := buffer.String()
+	return fmt.Sprintf("%s(%s)", res[0:repeatPos], res[repeatPos:])
 }
