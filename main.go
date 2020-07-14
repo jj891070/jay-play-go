@@ -56,7 +56,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 						log.Print(err)
 					}
 				case strings.Contains(message.Text, "hello"):
-					res = "nice to meet you！😌 "
+					res = "nice to meet you！😌~ "
 					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
 						log.Print(err)
 					}
@@ -66,8 +66,8 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 						log.Print(err)
 					}
 				default:
-					originalContentURL := "https://images.app.goo.gl/M55DNLhKRPGwN2ss7"
-					previewImageURL := "https://images.app.goo.gl/M55DNLhKRPGwN2ss7"
+					originalContentURL := "https://i.pinimg.com/736x/65/14/e8/6514e88d1bc17011c076cd525ac8e7df.jpg"
+					previewImageURL := "https://i.pinimg.com/736x/65/14/e8/6514e88d1bc17011c076cd525ac8e7df.jpg"
 
 					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewImageMessage(originalContentURL, previewImageURL)).Do(); err != nil {
 						log.Print(err)
