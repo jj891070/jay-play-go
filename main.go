@@ -66,8 +66,8 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 						log.Print(err)
 					}
 				default:
-					originalContentURL := "https://developers.line.biz/media/messaging-api/messages/image-full-04fbba55.png"
-					previewImageURL := "https://developers.line.biz/media/messaging-api/messages/image-167efb33.png"
+					originalContentURL := "https://images.app.goo.gl/M55DNLhKRPGwN2ss7"
+					previewImageURL := "https://images.app.goo.gl/M55DNLhKRPGwN2ss7"
 
 					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewImageMessage(originalContentURL, previewImageURL)).Do(); err != nil {
 						log.Print(err)
