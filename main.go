@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
+	"strings"
 
 	"github.com/line/line-bot-sdk-go/linebot"
 )
@@ -44,8 +44,34 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				log.Printf("message ---> %+v \n", message)
 				log.Printf("quota ---> %+v \n", quota)
-				if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(message.ID+":"+message.Text+" OK! remain message:"+strconv.FormatInt(quota.Value, 10))).Do(); err != nil {
-					log.Print(err)
+				var res string
+				switch {
+				case message.Text == "":
+					res = `
+						😉 您好，請問您需要什麼服務呢？
+						1. 請輸入hello
+						2. 請輸入寶哥好
+					`
+					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
+						log.Print(err)
+					}
+				case strings.Contains(message.Text, "hello"):
+					res = "nice to meet you！😌 "
+					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
+						log.Print(err)
+					}
+				case strings.Contains(message.Text, "寶哥"):
+					res = "老大好！🙋"
+					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
+						log.Print(err)
+					}
+				default:
+					originalContentURL := "https://developers.line.biz/media/messaging-api/messages/image-full-04fbba55.png"
+					previewImageURL := "https://developers.line.biz/media/messaging-api/messages/image-167efb33.png"
+
+					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewImageMessage(originalContentURL, previewImageURL)).Do(); err != nil {
+						log.Print(err)
+					}
 				}
 			}
 		}
