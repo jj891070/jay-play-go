@@ -24,7 +24,8 @@ func main() {
 
 func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	events, err := bot.ParseRequest(r)
-
+	log.Println(" ================ ")
+	log.Printf("event --> %+v \n", events)
 	if err != nil {
 		if err == linebot.ErrInvalidSignature {
 			w.WriteHeader(400)
@@ -52,7 +53,25 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 						1. 請輸入hello
 						2. 請輸入寶哥好
 					`
-					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
+					a := linebot.NewFlexMessage("我愛你", &linebot.BubbleContainer{
+						Type: linebot.FlexContainerTypeBubble,
+						Body: &linebot.BoxComponent{
+							Type:   linebot.FlexComponentTypeBox,
+							Layout: linebot.FlexBoxLayoutTypeVertical,
+							Contents: []linebot.FlexComponent{
+								&linebot.TextComponent{
+									Type: linebot.FlexComponentTypeText,
+									Text: "hello",
+								},
+								&linebot.TextComponent{
+									Type: linebot.FlexComponentTypeText,
+									Text: "world",
+								},
+							},
+						},
+					})
+
+					if _, err = bot.ReplyMessage(event.ReplyToken, a).Do(); err != nil {
 						log.Print(err)
 					}
 				case strings.Contains(message.Text, "hello"):
