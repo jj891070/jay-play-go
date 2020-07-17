@@ -37,6 +37,12 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, event := range events {
 		log.Println("userID --> ", event.Source.UserID)
+		var res *linebot.UserProfileResponse
+		res, err = bot.GetProfile(event.Source.UserID).Do()
+		log.Println("useraName:", res.DisplayName)
+		log.Println("language:", res.Language)
+		log.Println("status:", res.StatusMessage)
+		log.Println("pic:", res.PictureURL)
 		if event.Type == linebot.EventTypeMessage {
 			switch message := event.Message.(type) {
 			case *linebot.TextMessage:
