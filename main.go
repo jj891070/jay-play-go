@@ -26,6 +26,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	events, err := bot.ParseRequest(r)
 	log.Println(" ================ ")
 	log.Printf("event --> %+v \n", events)
+
 	if err != nil {
 		if err == linebot.ErrInvalidSignature {
 			w.WriteHeader(400)
@@ -36,6 +37,16 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, event := range events {
+
+		memberID := bot.GetGroupMemberIDs(event.Source.GroupID, os.Getenv("ChannelAccessToken"))
+		log.Println("groupID --> ", event.Source.GroupID)
+		log.Println("roomID --> ", event.Source.RoomID)
+		log.Println("memberIDs --> ", memberID)
+
+		if _, err := bot.Multicast([]string{event.Source.UserID}, linebot.NewTextMessage("hello my jay")).Do(); err != nil {
+			log.Println("Multicast Err -> ", err)
+		}
+
 		log.Println("userID --> ", event.Source.UserID)
 		var res *linebot.UserProfileResponse
 		res, err = bot.GetProfile(event.Source.UserID).Do()
