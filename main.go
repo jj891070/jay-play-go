@@ -41,7 +41,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		memberID := bot.GetGroupMemberIDs(event.Source.GroupID, os.Getenv("ChannelAccessToken"))
 		log.Println("groupID --> ", event.Source.GroupID)
 		log.Println("roomID --> ", event.Source.RoomID)
-		log.Println("memberIDs --> ", memberID)
+		log.Println("memberIDs --> ", memberID.NewScanner().ID())
 
 		if _, err := bot.Multicast([]string{event.Source.UserID}, linebot.NewTextMessage("hello my jay")).Do(); err != nil {
 			log.Println("Multicast Err -> ", err)
@@ -99,7 +99,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 							},
 						},
 					})
-
+					bot.BroadcastMessage(a)
 					if _, err = bot.ReplyMessage(event.ReplyToken, a).Do(); err != nil {
 						log.Print(err)
 					}
@@ -108,6 +108,8 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
 						log.Print(err)
 					}
+					bot.Narrowcast(linebot.NewTextMessage(res))
+
 				case strings.Contains(message.Text, "寶哥"):
 					res = "老大好！🙋"
 					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
