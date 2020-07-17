@@ -62,12 +62,22 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 							Layout: linebot.FlexBoxLayoutTypeVertical,
 							Contents: []linebot.FlexComponent{
 								&linebot.TextComponent{
-									Type: linebot.FlexComponentTypeText,
-									Text: "hello",
+									Color: "#00ff00",
+									Size:  "lg",
+									Type:  linebot.FlexComponentTypeText,
+									Text:  "單號：123456789",
 								},
 								&linebot.TextComponent{
-									Type: linebot.FlexComponentTypeText,
-									Text: "world",
+									Color: "#ff0000",
+									Align: "center",
+									Size:  "xl",
+									Type:  linebot.FlexComponentTypeText,
+									Text:  "[Succes]",
+								},
+								&linebot.TextComponent{
+									Type:  linebot.FlexComponentTypeText,
+									Align: "center",
+									Text:  "內容...💮 🌸 🏵",
 								},
 							},
 						},
