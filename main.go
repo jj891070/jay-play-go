@@ -47,7 +47,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 				log.Printf("quota ---> %+v \n", quota)
 				var res string
 				switch {
-				case message.Text == "":
+				case message.Text == "e":
 					res = `
 						😉 您好，請問您需要什麼服務呢？
 						1. 請輸入hello
