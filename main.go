@@ -36,6 +36,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, event := range events {
+		log.Println("userID --> ", event.Source.UserID)
 		if event.Type == linebot.EventTypeMessage {
 			switch message := event.Message.(type) {
 			case *linebot.TextMessage:
@@ -53,6 +54,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 						1. 請輸入hello
 						2. 請輸入寶哥好
 					`
+
 					a := linebot.NewFlexMessage("我愛你", &linebot.BubbleContainer{
 						Type: linebot.FlexContainerTypeBubble,
 						Body: &linebot.BoxComponent{
@@ -82,6 +84,85 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 				case strings.Contains(message.Text, "寶哥"):
 					res = "老大好！🙋"
 					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
+						log.Print(err)
+					}
+				case message.Text == "123": // carousel
+					resp := linebot.NewTemplateMessage(
+						"this is a carousel template with imageAspectRatio,  imageSize and imageBackgroundColor",
+						linebot.NewCarouselTemplate(
+							linebot.NewCarouselColumn(
+								"https://farm5.staticflickr.com/4849/45718165635_328355a940_m.jpg",
+								"this is menu",
+								"description",
+								linebot.NewPostbackAction("Buy", "action=buy&itemid=111", "", ""),
+								linebot.NewPostbackAction("Add to cart", "action=add&itemid=111", "", ""),
+								linebot.NewURIAction("View detail", "http://example.com/page/111"),
+							).WithImageOptions("#FFFFFF"),
+							linebot.NewCarouselColumn(
+								"https://farm5.staticflickr.com/4849/45718165635_328355a940_m.jpg",
+								"this is menu",
+								"description",
+								linebot.NewPostbackAction("Buy", "action=buy&itemid=111", "", ""),
+								linebot.NewPostbackAction("Add to cart", "action=add&itemid=111", "", ""),
+								linebot.NewURIAction("View detail", "http://example.com/page/111"),
+							).WithImageOptions("#FFFFFF"),
+						).WithImageOptions("rectangle", "cover"),
+					)
+					_, err = bot.ReplyMessage(event.ReplyToken, resp).Do()
+					if err != nil {
+						log.Print(err)
+					}
+				case message.Text == "789": // quicklyresponse
+					resp := linebot.NewTextMessage(
+						"Select your favorite food category or send me your location!",
+					).WithQuickReplies(
+						linebot.NewQuickReplyItems(
+							linebot.NewQuickReplyButton("https://example.com/sushi.png", linebot.NewMessageAction("Sushi", "Sushi")),
+							linebot.NewQuickReplyButton("https://example.com/tempura.png", linebot.NewMessageAction("Tempura", "Tempura")),
+							linebot.NewQuickReplyButton("", linebot.NewLocationAction("Send location")),
+						),
+					)
+
+					_, err = bot.ReplyMessage(event.ReplyToken, resp).Do()
+					if err != nil {
+						log.Print(err)
+					}
+				case message.Text == "456": //confirm
+					resp := linebot.NewTemplateMessage(
+						"this is a confirm template",
+						linebot.NewConfirmTemplate(
+							"Are you sure?",
+							linebot.NewMessageAction("Yes", "yes"),
+							linebot.NewMessageAction("No", "no"),
+						),
+					)
+
+					_, err = bot.ReplyMessage(event.ReplyToken, resp).Do()
+					if err != nil {
+						log.Print(err)
+					}
+				case message.Text == "qa":
+					resp := linebot.NewTemplateMessage(
+						"this is a buttons template",
+						linebot.NewButtonsTemplate(
+							"https://farm5.staticflickr.com/4849/45718165635_328355a940_m.jpg",
+							"Menu",
+							"Please select",
+							linebot.NewPostbackAction("Buy", "action=buy&itemid=123", "", "displayText"),
+							linebot.NewPostbackAction("Buy", "action=buy&itemid=123", "text", ""),
+							linebot.NewURIAction("View detail", "http://example.com/page/123"),
+						),
+					)
+
+					_, err = bot.ReplyMessage(event.ReplyToken, resp).Do()
+					if err != nil {
+						log.Print(err)
+					}
+				case message.Text == "location":
+					resp := linebot.NewLocationMessage("現在地", "宮城県多賀城市", 38.297807, 141.031)
+
+					_, err = bot.ReplyMessage(event.ReplyToken, resp).Do()
+					if err != nil {
 						log.Print(err)
 					}
 				default:
