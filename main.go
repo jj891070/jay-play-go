@@ -2,53 +2,89 @@ package main
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/md5"
+	"encoding/base64"
+
+	"encoding/hex"
 	"fmt"
-	"strings"
-	"time"
 )
 
-var way map[int]string
+func main() {
 
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
+	// md5加密
+	str := "something"
+	h := md5.New()
 
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
+	h.Write([]byte(str)) // 需要加密的字符串为buf.String()
 
-	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
+	fmt.Printf("%s\n", hex.EncodeToString(h.Sum(nil))) // 输出加密结果
+
+	// aes 加密
+	orig := "hello world"
+	key := "123456781234567812345678"
+	fmt.Println("原文：", orig)
+
+	encryptCode := AesEncrypt(orig, key)
+	fmt.Println("密文：", encryptCode)
+
+	decryptCode := AesDecrypt(encryptCode, key)
+	fmt.Println("解密结果：", decryptCode)
 }
 
-func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
+func AesEncrypt(orig string, key string) string {
+	// 转成字节数组
+	origData := []byte(orig)
+	k := []byte(key)
 
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
-	}
+	// 分组秘钥
+	block, _ := aes.NewCipher(k)
+	// 获取秘钥块的长度
+	blockSize := block.BlockSize()
+	// 补全码
+	origData = PKCS7Padding(origData, blockSize)
+	// 加密模式
+	blockMode := cipher.NewCBCEncrypter(block, k[:blockSize])
+	// 创建数组
+	cryted := make([]byte, len(origData))
+	// 加密
+	blockMode.CryptBlocks(cryted, origData)
+
+	return base64.StdEncoding.EncodeToString(cryted)
+
+}
+
+func AesDecrypt(cryted string, key string) string {
+	// 转成字节数组
+	crytedByte, _ := base64.StdEncoding.DecodeString(cryted)
+	k := []byte(key)
+
+	// 分组秘钥
+	block, _ := aes.NewCipher(k)
+	// 获取秘钥块的长度
+	blockSize := block.BlockSize()
+	// 加密模式
+	blockMode := cipher.NewCBCDecrypter(block, k[:blockSize])
+	// 创建数组
+	orig := make([]byte, len(crytedByte))
+	// 解密
+	blockMode.CryptBlocks(orig, crytedByte)
+	// 去补全码
+	orig = PKCS7UnPadding(orig)
+	return string(orig)
+}
+
+//补码
+func PKCS7Padding(ciphertext []byte, blocksize int) []byte {
+	padding := blocksize - len(ciphertext)%blocksize
+	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
+	return append(ciphertext, padtext...)
+}
+
+//去码
+func PKCS7UnPadding(origData []byte) []byte {
+	length := len(origData)
+	unpadding := int(origData[length-1])
+	return origData[:(length - unpadding)]
 }
