@@ -99,7 +99,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 							},
 						},
 					})
-					bot.BroadcastMessage(a)
+					// bot.BroadcastMessage(a)
 					if _, err = bot.ReplyMessage(event.ReplyToken, a).Do(); err != nil {
 						log.Print(err)
 					}
@@ -108,7 +108,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(res)).Do(); err != nil {
 						log.Print(err)
 					}
-					bot.Narrowcast(linebot.NewTextMessage(res))
+					// bot.Narrowcast(linebot.NewTextMessage(res))
 
 				case strings.Contains(message.Text, "寶哥"):
 					res = "老大好！🙋"
@@ -195,12 +195,12 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 						log.Print(err)
 					}
 				default:
-					originalContentURL := "https://i.pinimg.com/736x/65/14/e8/6514e88d1bc17011c076cd525ac8e7df.jpg"
-					previewImageURL := "https://i.pinimg.com/736x/65/14/e8/6514e88d1bc17011c076cd525ac8e7df.jpg"
+					// originalContentURL := "https://i.pinimg.com/736x/65/14/e8/6514e88d1bc17011c076cd525ac8e7df.jpg"
+					// previewImageURL := "https://i.pinimg.com/736x/65/14/e8/6514e88d1bc17011c076cd525ac8e7df.jpg"
 
-					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewImageMessage(originalContentURL, previewImageURL)).Do(); err != nil {
-						log.Print(err)
-					}
+					// if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewImageMessage(originalContentURL, previewImageURL)).Do(); err != nil {
+					// 	log.Print(err)
+					// }
 				}
 			}
 		}
