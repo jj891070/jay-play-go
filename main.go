@@ -43,9 +43,9 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println("roomID --> ", event.Source.RoomID)
 		log.Println("memberIDs --> ", memberID.NewScanner().ID())
 
-		if _, err := bot.Multicast([]string{event.Source.UserID}, linebot.NewTextMessage("hello my jay")).Do(); err != nil {
-			log.Println("Multicast Err -> ", err)
-		}
+		// if _, err := bot.Multicast([]string{event.Source.UserID}, linebot.NewTextMessage("hello my jay")).Do(); err != nil {
+		// 	log.Println("Multicast Err -> ", err)
+		// }
 
 		log.Println("userID --> ", event.Source.UserID)
 		var res *linebot.UserProfileResponse
