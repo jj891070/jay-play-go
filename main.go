@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	fmt.Println("Hello World")
+	fmt.Println("💖 Hello World")
 	r := gin.Default()
 	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Hello E.F.K")

@@ -1,3 +1,13 @@
+filebeat.inputs:
+    - type: docker
+    #   combine_partial: true
+      containers:
+        path: "/var/lib/docker/containers"
+        stream: "all"
+        ids:
+          - "*"
+      ignore_older: 10m
+
 filebeat.config:
     modules:
       path: ${path.config}/modules.d/*.yml
@@ -9,9 +19,18 @@ filebeat.autodiscover:
           hints.enabled: true
 
 processors:
-- add_cloud_metadata: ~
+# decode the log field (sub JSON document) if JSON encoded, then maps it's fields to elasticsearch fields
+- decode_json_fields:
+    fields: ["log", "message"]
+    target: ""
+    # overwrite existing target elasticsearch fields while decoding json fields    
+    overwrite_keys: true
+- add_docker_metadata:
+    host: "unix:///var/run/docker.sock"
 
 output.elasticsearch:
     hosts: '${ELASTICSEARCH_HOSTS:elasticsearch:9200}'
+    indices:
+        - index: "filebeat-%{[agent.version]}-%{+yyyy.MM.dd}"
     username: '${ELASTICSEARCH_USERNAME:}'
     password: '${ELASTICSEARCH_PASSWORD:}'
