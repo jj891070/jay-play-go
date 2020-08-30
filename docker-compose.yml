@@ -1,0 +1,52 @@
+version: '2'
+
+services:
+  web:
+    # docker run --rm -v "$PWD":/usr/src/myapp -w /usr/src/myapp golang:1.14 go build -v
+    image: golang:1.14-alpine3.12
+    hostname: web
+    ports:
+      - "80:8080"
+    command: go run main.go
+    working_dir: /app
+    volumes:
+      - .:/app
+      # - $GOPATH:/go
+    environment:
+      - GIN_MODE=debug
+    logging:
+      driver: json-file
+      options:
+        env: ${ENV}
+        labels: demo_web
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.9.0
+    user: root
+    environment: 
+      setup.kibana.host: "kibana:5601"
+      output.elasticsearch.hosts: "elasticsearch:9200"
+    volumes:
+      - ./filebeat/filebeat.yaml:/usr/share/filebeat/filebeat.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      discovery.type: single-node
+    
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.9.0
+    ports:
+      - 5601:5601
+    # environment: 
+    #   ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    volumes:
+      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
+    depends_on:
+      - elasticsearch
+  
