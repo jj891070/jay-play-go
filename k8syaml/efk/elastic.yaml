@@ -1,0 +1,73 @@
+# curl -X GET "elasticsearch-0.elasticsearch.dev.svc.cluster.local:9200/_cat/nodes?v&pretty"
+# curl http://elasticsearch-0.elasticsearch.dev.svc.cluster.local:9200/_cat/indices?v
+# curl -X GET "localhost:9200/_cat/nodes?v&pretty"
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: dev
+  labels:
+    k8s-app: elasticsearch
+spec:
+  serviceName: elasticsearch
+  selector:
+    matchLabels:
+      k8s-app: elasticsearch
+  template:
+    metadata:
+      labels:
+        k8s-app: elasticsearch
+    spec:
+      containers:
+      - image: elasticsearch:7.9.0
+        name: elasticsearch
+        resources:
+          limits:
+            cpu: 1
+            memory: 2Gi
+          requests:
+            cpu: 0.5 
+            memory: 500Mi
+        env:
+          - name: "discovery.type"
+            value: "single-node"
+          # - name: ES_JAVA_OPTS
+          #   value: "-Xms512m -Xmx2g" 
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+          subPath: data
+      initContainers:
+        - name: elastic-data-permission-fix
+          image: busybox
+          command: ["/bin/chmod","-R","777", "/data"]
+          volumeMounts:
+          - name: elasticsearch-data
+            mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: dev
+spec:
+  clusterIP: None
+  ports:
+    - name: http1
+      protocol: TCP
+      port: 9200
+      targetPort: 9200
+    - name: http2
+      protocol: TCP
+      port: 9300
+      targetPort: 9300
+  selector:
+    k8s-app: elasticsearch

@@ -1,4 +1,4 @@
-version: '2'
+version: "3.8"
 
 services:
   web:
@@ -22,14 +22,16 @@ services:
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:7.9.0
-    user: root
+    # user: root
     environment: 
       setup.kibana.host: "kibana:5601"
       output.elasticsearch.hosts: "elasticsearch:9200"
     volumes:
-      - ./filebeat/filebeat.yaml:/usr/share/filebeat/filebeat.yml
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: filebeat -e -strict.perms=false
+    
   
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.9.0
@@ -49,4 +51,5 @@ services:
       - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
     depends_on:
       - elasticsearch
-  
+  test:
+    image: jj891070/apache2-phpredisadmin

@@ -6,7 +6,7 @@ filebeat.inputs:
         stream: "all"
         ids:
           - "*"
-      ignore_older: 10m
+      ignore_older: 30m
 
 filebeat.config:
     modules:

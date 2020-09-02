@@ -1,0 +1,234 @@
+# kubectl get daemonsets.apps   -n kube-system
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: filebeat-inputs
+#   namespace: filebeat
+#   labels:
+#     k8s-app: filebeat
+# data:
+#   kubernetes.yml: |-
+#     - type: log
+#       enabled: true
+#       paths:
+#         - /ocean/log/*.json
+#       tags: ["json"]
+#       json.keys_under_root: true
+#       json.add_error_key: false
+#       json.message_key: log
+#       ignore_older: 1800m
+#       # 自訂變數
+#       fields:
+#         log_topic: "topic-system-log"
+
+
+#     processors:
+#       - timestamp:
+#           field: '@t'
+#           target_field: '@timestamp-log'
+#           timezone: 'Asia/Taipei'
+#           layouts:
+#             - '2006-01-02T15:04:05Z'
+#       - drop_fields:
+#           fields: ["agent", "ecs", "input", "log.offset", "version"]
+#           ignore_missing: true
+# ---
+# 定义一个`name=filebeat-config`的configMap，用于指定 filebeat output
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: filebeat
+  labels:
+    k8s-app: filebeat
+data:
+  filebeat.yml: |-
+    filebeat.inputs:
+    - type: log
+      enabled: true
+      paths:
+        - /ocean/log/*.json
+      tags: ["json"]
+      json.keys_under_root: true
+      json.add_error_key: false
+      json.message_key: log
+      ignore_older: 1800m
+      # 自訂變數
+      fields:
+        log_topic: "topic-system-log"
+
+    processors:
+      - timestamp:
+          field: '@t'
+          target_field: '@timestamp-log'
+          timezone: 'Asia/Taipei'
+          layouts:
+            - '2006-01-02T15:04:05Z'
+      - drop_fields:
+          fields: ["agent", "ecs", "input", "log.offset", "version"]
+          ignore_missing: true
+
+    cloud.id: ${ELASTIC_CLOUD_ID}
+    cloud.auth: ${ELASTIC_CLOUD_AUTH}
+
+    output.console:
+      enabled: false
+      pretty: true
+
+    output.elasticsearch:
+      enabled: true
+      hosts: ['${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}']
+      username: ${ELASTICSEARCH_USERNAME}
+      password: ${ELASTICSEARCH_PASSWORD}
+      indices:
+          - index: "jay-filebeat-%{+yyyy.MM.dd}"
+            # when.equals:
+            #   Logging: "Text"
+    
+    output.kafka:
+      enabled: false
+      # initial brokers for reading cluster metadata
+      hosts: ["HOST_NAME:9092"]
+      
+      # User
+      ssl.enabled: true
+      username: ""
+      password: ""
+
+      # message topic selection + partitioning
+      topic: '%{[fields.log_topic]}'
+      partition.round_robin:
+        reachable_only: false
+    
+      compression: gzip
+      max_message_bytes: 1000000
+
+    logging.to_files: true
+      
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: filebeat
+  namespace: filebeat
+  labels:
+    k8s-app: filebeat
+spec:
+  selector:
+    matchLabels:
+      k8s-app: filebeat
+  template:
+    metadata:
+      labels:
+        k8s-app: filebeat
+    spec:
+      serviceAccountName: filebeat
+      terminationGracePeriodSeconds: 30
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: filebeat
+        image: docker.elastic.co/beats/filebeat:7.9.0
+        args: [
+          "-c", "/etc/filebeat.yml",
+          "-e",
+        ]
+        env:
+        - name: ELASTICSEARCH_HOST
+          value: "elasticsearch-0.elasticsearch.dev.svc.cluster.local"
+        - name: ELASTICSEARCH_PORT
+          value: "9200"
+        - name: ELASTICSEARCH_USERNAME
+          value: elastic
+        - name: ELASTICSEARCH_PASSWORD
+          value: qwe123
+        - name: ELASTIC_CLOUD_ID
+          value:
+        - name: ELASTIC_CLOUD_AUTH
+          value:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          runAsUser: 0
+          # If using Red Hat OpenShift uncomment this:
+          #privileged: true
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/filebeat.yml
+          readOnly: true
+          subPath: filebeat.yml
+        - name: data
+          mountPath: /usr/share/filebeat/data
+        - name: varlibdockercontainers
+          mountPath: /ocean/log
+          readOnly: true
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          defaultMode: 0600
+          name: filebeat-config
+      # - name: inputs
+      #   configMap:
+      #     defaultMode: 0600
+      #     name: filebeat-inputs
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/ocean/log
+          type: DirectoryOrCreate
+      - name: varlog
+        hostPath:
+          path: /var/log
+      # data folder stores a registry of read status for all files, so we don't send everything again on a Filebeat pod restart
+      - name: data
+        hostPath:
+          path: /var/lib/filebeat-data
+          type: DirectoryOrCreate
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: filebeat
+subjects:
+- kind: ServiceAccount
+  name: filebeat
+  namespace: filebeat
+roleRef:
+  kind: ClusterRole
+  name: filebeat
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: filebeat
+  labels:
+    k8s-app: filebeat
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources:
+  - namespaces
+  - pods
+  verbs:
+  - get
+  - watch
+  - list
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: filebeat
+  namespace: filebeat
+  labels:
+    k8s-app: filebeat
+---

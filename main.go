@@ -5,26 +5,28 @@ import (
 	"net/http"
 	"os"
 	"github.com/gin-gonic/gin"
+	"log"
+	"time"
 )
 
 func main() {
 	fmt.Println("💖 Hello World")
 
-	f,err := os.Create("jay.json")
+	f, err := os.OpenFile("/ocean/log/jay.json",
+	os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	var data string
+	now := time.Now() 
 
 
-	if err !=nil {
-
-		fmt.Println( err.Error() )
+	data = `{"name": "💖 Hello Jay `+now.Format(time.RFC3339) +` "}`+"\n"
+	if _, err := f.WriteString(data); err != nil {
+		log.Println(err)
 		f.Close()
-
-	} else {
-
-		_,err=f.Write([]byte(`{"name": "💖 Hello Jay"}`))
-		if err!= nil{
-			fmt.Println( err.Error() )
-		}
-
+		return
 	}
 
 	f.Close()
