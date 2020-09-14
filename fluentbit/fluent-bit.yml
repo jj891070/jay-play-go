@@ -159,13 +159,13 @@ spec:
         # - name: FLUENT_ELASTICSEARCH_HOST
         #   value: "elasticsearch-0.elasticsearch.dev.svc.cluster.local"
         - name: FLUENT_ELASTICSEARCH_HOST
-          value: "336ed205f83d4b85ad55a63ae2e1660a.asia-east1.gcp.elastic-cloud.com"
+          value: ""
         - name: FLUENT_ELASTICSEARCH_PORT
           value: "9243"
         - name: FLUENT_ELASTICSEARCH_USER
           value: "elastic"
         - name: FLUENT_ELASTICSEARCH_PASSWORD
-          value: "ty7dmNavsZar0Ct30ex3iSzE"
+          value: ""
         # readinessProbe:
         #   httpGet:
         #     path: /api/v1/metrics/prometheus
