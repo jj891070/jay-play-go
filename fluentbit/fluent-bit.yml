@@ -68,8 +68,8 @@ data:
         rdkafka.ssl.endpoint.identification.algorithm https
         rdkafka.security.protocol SASL_SSL
         rdkafka.sasl.mechanism PLAIN
-        rdkafka.sasl.username KZ37HRM6ON3UXJ7K
-        rdkafka.sasl.password S5rgoP2vEQomAA84/82iz+rF1+mPrE027fjvtCcHCwWCxa0gzcijr+FLHEj5WuVK
+        rdkafka.sasl.username {}
+        rdkafka.sasl.password {}
 
         # hides errors "Receive failed: Disconnected" when kafka kills idle connections
         rdkafka.log.connection.close false
