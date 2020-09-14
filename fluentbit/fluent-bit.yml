@@ -1,0 +1,241 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: fluent
+  labels:
+    k8s-app: fluent-bit
+data:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Log_Level     info
+        Daemon        off
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+    @INCLUDE input-kubernetes.conf
+    @INCLUDE filter-kubernetes.conf
+    # @INCLUDE output-elasticsearch.conf
+    @INCLUDE output-kafka.conf
+  input-kubernetes.conf: |
+    [INPUT]
+        Name              tail
+        # Tag               kube.*
+        Path              /var/log/*.json
+        Parser            docker
+        DB                /var/log/flb_kube.db
+        Mem_Buf_Limit     5MB
+        Skip_Long_Lines   Off
+        Refresh_Interval  10
+  filter-kubernetes.conf: |
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Merge_Log_Key       log_processed
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude Off
+  # output-elasticsearch.conf: |
+  #   [OUTPUT]
+  #       Name            es
+  #       Match           *
+  #       Host            ${FLUENT_ELASTICSEARCH_HOST}
+  #       Port            ${FLUENT_ELASTICSEARCH_PORT}
+  #       HTTP_User       ${FLUENT_ELASTICSEARCH_USER}
+  #       HTTP_Passwd     ${FLUENT_ELASTICSEARCH_PASSWORD}
+  #       Logstash_Format On
+  #       Replace_Dots    On
+  #       Retry_Limit     False
+  #       Index jay-fluent-bit
+  #       tls on
+  output-kafka.conf: |
+    [OUTPUT]
+        Name           kafka
+        Match          *
+        Brokers        pkc-l7j7w.asia-east1.gcp.confluent.cloud:9092
+        Topics         jay-fluentbit.stream.json.001
+        Timestamp_Key  @timestamp
+        Retry_Limit    false
+        rdkafka.bootstrap.servers pkc-l7j7w.asia-east1.gcp.confluent.cloud:9092
+        rdkafka.ssl.endpoint.identification.algorithm https
+        rdkafka.security.protocol SASL_SSL
+        rdkafka.sasl.mechanism PLAIN
+        rdkafka.sasl.username KZ37HRM6ON3UXJ7K
+        rdkafka.sasl.password S5rgoP2vEQomAA84/82iz+rF1+mPrE027fjvtCcHCwWCxa0gzcijr+FLHEj5WuVK
+
+        # hides errors "Receive failed: Disconnected" when kafka kills idle connections
+        rdkafka.log.connection.close false
+        # producer buffer is not included in http://fluentbit.io/documentation/0.12/configuration/memory_usage.html#estimating
+        rdkafka.queue.buffering.max.kbytes 10240
+        # for logs you'll probably want this ot be 0 or 1, not more
+        rdkafka.request.required.acks 1
+        # rdkafka.max.in.flight.requests.per.connection 5
+        # rdkafka.retries 5
+        # rdkafka.acks all
+        # rdkafka.queuing.strategy fifo
+        # rdkafka.enable.idempotence true
+  parsers.conf: |
+    # [PARSER]
+    #     Name   apache
+    #     Format regex
+    #     Regex  ^(?<host>[^ ]*) [^ ]* (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^\"]*?)(?: +\S*)?)?" (?<code>[^ ]*) (?<size>[^ ]*)(?: "(?<referer>[^\"]*)" "(?<agent>[^\"]*)")?$
+    #     Time_Key time
+    #     Time_Format %d/%b/%Y:%H:%M:%S %z
+    # [PARSER]
+    #     Name   apache2
+    #     Format regex
+    #     Regex  ^(?<host>[^ ]*) [^ ]* (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^ ]*) +\S*)?" (?<code>[^ ]*) (?<size>[^ ]*)(?: "(?<referer>[^\"]*)" "(?<agent>[^\"]*)")?$
+    #     Time_Key time
+    #     Time_Format %d/%b/%Y:%H:%M:%S %z
+    # [PARSER]
+    #     Name   apache_error
+    #     Format regex
+    #     Regex  ^\[[^ ]* (?<time>[^\]]*)\] \[(?<level>[^\]]*)\](?: \[pid (?<pid>[^\]]*)\])?( \[client (?<client>[^\]]*)\])? (?<message>.*)$
+    # [PARSER]
+    #     Name   nginx
+    #     Format regex
+    #     Regex ^(?<remote>[^ ]*) (?<host>[^ ]*) (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^\"]*?)(?: +\S*)?)?" (?<code>[^ ]*) (?<size>[^ ]*)(?: "(?<referer>[^\"]*)" "(?<agent>[^\"]*)")?$
+    #     Time_Key time
+    #     Time_Format %d/%b/%Y:%H:%M:%S %z
+    [PARSER]
+        Name   json
+        Format json
+        Time_Key time
+        Time_Format %d/%b/%Y:%H:%M:%S %z
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+    # [PARSER]
+    #     Name        syslog
+    #     Format      regex
+    #     Regex       ^\<(?<pri>[0-9]+)\>(?<time>[^ ]* {1,2}[^ ]* [^ ]*) (?<host>[^ ]*) (?<ident>[a-zA-Z0-9_\/\.\-]*)(?:\[(?<pid>[0-9]+)\])?(?:[^\:]*\:)? *(?<message>.*)$
+    #     Time_Key    time
+    #     Time_Format %b %d %H:%M:%S
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: fluent
+  labels:
+    k8s-app: fluent-bit-logging
+    version: v1
+    kubernetes.io/cluster-service: "true"
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      k8s-app: fluent-bit-logging
+  template:
+    metadata:
+      labels:
+        k8s-app: fluent-bit-logging
+        version: v1
+        kubernetes.io/cluster-service: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "2020"
+        prometheus.io/path: /api/v1/metrics/prometheus
+    spec:
+      containers:
+      - name: fluent-bit
+        image: fluent/fluent-bit:1.5.5
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 2020
+        env:
+        # - name: FLUENT_ELASTICSEARCH_HOST
+        #   value: "elasticsearch-0.elasticsearch.dev.svc.cluster.local"
+        - name: FLUENT_ELASTICSEARCH_HOST
+          value: "336ed205f83d4b85ad55a63ae2e1660a.asia-east1.gcp.elastic-cloud.com"
+        - name: FLUENT_ELASTICSEARCH_PORT
+          value: "9243"
+        - name: FLUENT_ELASTICSEARCH_USER
+          value: "elastic"
+        - name: FLUENT_ELASTICSEARCH_PASSWORD
+          value: "ty7dmNavsZar0Ct30ex3iSzE"
+        # readinessProbe:
+        #   httpGet:
+        #     path: /api/v1/metrics/prometheus
+        #     port: 2020
+        # livenessProbe:
+        #   httpGet:
+        #     path: /
+        #     port: 2020
+        # resources:
+        #   requests:
+        #     cpu: 5m
+        #     memory: 10Mi
+        #   limits:
+        #     cpu: 50m
+        #     memory: 60Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: fluent-bit-config
+          mountPath: /fluent-bit/etc/
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/ocean/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: fluent-bit-config
+        configMap:
+          name: fluent-bit-config
+      serviceAccountName: fluent-bit
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+    name: fluent-bit-read
+roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: fluent-bit-read
+subjects:
+- kind: ServiceAccount
+  name: fluent-bit
+  namespace: fluent
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+    name: fluent-bit-read
+rules:
+- apiGroups: [""]
+  resources:
+  - namespaces
+  - pods
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+    name: fluent-bit
+    namespace: fluent
