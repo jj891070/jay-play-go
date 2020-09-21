@@ -23,7 +23,7 @@ func main() {
 			log.Fatal(err)
 		}
 		if tmp < last {
-			log.Fatalln("wait ")
+			log.Fatalln("tmp < last ...")
 		} else {
 			last = tmp
 		}
@@ -31,7 +31,7 @@ func main() {
 		wg.Done()
 		return nil
 	}))
-	err := q.ConnectToNSQLookupd("127.0.0.1:4161")
+	err := q.ConnectToNSQD("127.0.0.1:4150")
 	if err != nil {
 		log.Panic(err)
 	}
