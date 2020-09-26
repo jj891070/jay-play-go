@@ -1,0 +1,25 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: redis-interface
+  namespace: redis
+spec:
+  selector:
+    matchLabels:
+      app: redis-interface
+  replicas: 1 # tells deployment to run 1 pods matching the template
+  template:
+    metadata:
+      labels:
+        app: redis-interface
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: default-pool
+      containers:
+      - name: app
+        image: rediscommander/redis-commander:latest
+        env:
+          - name: REDIS_HOSTS
+            value: redis-platform:redis-0.redis:6379:0,redis-ht-slot:redis-1.redis:6379:0
+        ports:
+        - containerPort: 8081
