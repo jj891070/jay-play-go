@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: jay-test
-        image: asia.gcr.io/ag-ocean-dev/jay-go-elk-test:latest
+        image: asia.gcr.io/[...]/jay-go-elk-test:latest
         ports:
         - containerPort: 80
         volumeMounts:
