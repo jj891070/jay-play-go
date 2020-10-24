@@ -1,54 +1,60 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
-	"strings"
+	"flag"
+	"log"
+	"sync"
 	"time"
+
+	redis "github.com/go-redis/redis"
 )
 
-var way map[int]string
-
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
-
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
-	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
-}
+var agent = flag.Bool("b", false, "bool类型参数")
 
 func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
+	flag.Parse()
+	conn := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
 
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+	if *agent {
+		log.Println("A")
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+		go func() {
+			log.Println("B")
+			sub := conn.Subscribe("out1")
+			conn.LPush("in", "1")
+			log.Println(<-sub.Channel())
+			wg.Done()
+		}()
+		go func() {
+			log.Println("C")
+			sub := conn.Subscribe("out2")
+			conn.LPush("in", "2")
+			log.Println(<-sub.Channel())
+			wg.Done()
+		}()
+
+		wg.Wait()
+		return
 	}
+
+	for {
+		in, err := conn.BRPop(time.Second*5, "in").Result()
+		if err != nil {
+			if err == redis.Nil {
+				log.Println("ya!!")
+				continue
+			}
+			log.Println(err)
+			continue
+		}
+
+		log.Println("進來: %+v", in)
+		conn.Publish("out"+in[1], "ok -> "+in[1])
+	}
+
 }
