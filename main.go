@@ -3,52 +3,67 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"strings"
-	"time"
+	"log"
+	"os"
+	"os/exec"
 )
 
-var way map[int]string
-
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
-
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
+func main() {
+	Replace()
+	execRoot, err := os.Getwd()
+	if err != nil {
+		log.Println("err -> ", err)
 	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
+	log.Println(execRoot)
 }
 
-func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
-
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+// Replace 覆蓋掉
+func Replace() {
+	// ls $K8sBaseKustomizationPath | while read -r filename; do sed -i "s/VERSION_ID/${IMAGEID}/g" $K8sBaseKustomizationPath/$filename; done
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command(
+		"/bin/bash", "job.sh",
+		"AgOcean.InfraInfo/resources/infra-app/ag-ocean/base-app/cloud/accountsystem",
+		"1.1.1.1",
+		"accountsystem",
+		"agocean",
+		"tmp",
+		".zip",
+	)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("err -> %+v , %+v \n", err, string(stderr.Bytes()))
 	}
+	log.Println(string(stdout.Bytes()))
+}
+
+// GitPull 更新infra repo
+func GitPull() {
+	// Update CN site repo.
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("git", "-C", "AgOcean.InfraInfo", "pull")
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("err -> %+v , %+v \n", err, string(stderr.Bytes()))
+	}
+	log.Println(string(stdout.Bytes()))
+}
+
+// Demo 範例
+func Demo() {
+	cmd := exec.Command("ls", "-lah")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("cmd.Run() failed with %s\n", err)
+	}
+	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
+	fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
+	return
 }
