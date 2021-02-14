@@ -1,5 +1,6 @@
-## 好用的client工具，類似於postman
-1. bloomRPC : https://github.com/uw-labs/bloomrpc
+## 好用的參考網址
+1. bloomRPC(好用的client工具，類似於postman) : https://github.com/uw-labs/bloomrpc
+2. proto變數型態 : https://developers.google.com/protocol-buffers/docs/proto3
 ## go 
 ### 安裝proto工具
 ```shell
@@ -22,7 +23,12 @@ python -m pip install grpcio-tools
 
 ### 產生grpc和rpc檔案
 ```shell
-python -m grpc_tools.protoc --proto_path=protos/ --python_out=python/server/ --grpc_python_out=python/server/ hello.proto
+# server的產生grpc文檔方式
+python -m grpc_tools.protoc --proto_path=protos/ --python_out=python/server/proto --grpc_python_out=python/server/proto hello.proto
+
+# client的產生grpc文檔方式
+python -m grpc_tools.protoc --proto_path=protos/ --python_out=python/client/proto --grpc_python_out=python/client/proto hello.proto
+
 
 # 記得要去hello_pb2_grpc.py的檔案裡，將
 # import hello_pb2 as hello__pb2

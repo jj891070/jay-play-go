@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// option go_package = "proto/helloworld";
+option go_package = "proto/helloworld";
 
 // The greeting service definition.
 service Greeter {
