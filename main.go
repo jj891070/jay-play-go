@@ -1,54 +1,50 @@
 package main
 
 import (
-	"bytes"
+	"context"
+	"flag"
 	"fmt"
-	"strings"
-	"time"
+	"log"
+
+	api "github.com/alanchchen/grpc-lb-istio/api"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
-var way map[int]string
+var (
+	host   string
+	port   int
+	repeat int
+)
 
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
-
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
-	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
+func init() {
+	flag.StringVar(&host, "host", "127.0.0.1", "The server host")
+	flag.IntVar(&port, "port", 7000, "The server port")
+	flag.IntVar(&repeat, "repeat", 1, "Times to call server")
+	flag.Parse()
 }
 
 func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", host, port),
+		grpc.WithInsecure(),
+	)
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := api.NewIdentityClient(conn)
 
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+	ctx := metadata.NewOutgoingContext(context.Background(), metadata.New(map[string]string{
+		"Content-Type": "application/grpc",
+	}))
+
+	for i := 0; i < repeat; i++ {
+		r, err := c.Who(ctx, &api.WhoRequest{})
+		if err != nil {
+			log.Printf("%v\n", err)
+			continue
+		}
+		log.Printf("%s\n", r.Name)
 	}
 }
