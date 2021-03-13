@@ -1,4 +1,8 @@
+# github.com/gofrs/uuid v4.0.0+incompatible
+## explicit
+github.com/gofrs/uuid
 # github.com/golang/protobuf v1.4.2
+## explicit
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
@@ -68,8 +72,8 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # google.golang.org/grpc/examples v0.0.0-20210211230339-9f3606cd0f76
 ## explicit
-google.golang.org/grpc/examples/helloworld/helloworld
 # google.golang.org/protobuf v1.25.0
+## explicit
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
