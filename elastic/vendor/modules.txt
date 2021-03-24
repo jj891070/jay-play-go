@@ -1,0 +1,6 @@
+# github.com/elastic/go-elasticsearch/v8 v8.0.0-20210305160311-265434a3b4ca
+## explicit
+github.com/elastic/go-elasticsearch/v8
+github.com/elastic/go-elasticsearch/v8/esapi
+github.com/elastic/go-elasticsearch/v8/estransport
+github.com/elastic/go-elasticsearch/v8/internal/version

@@ -1,50 +1,76 @@
 package main
 
+/**
+ * Copyright 2020 Confluent Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import (
-	"context"
-	"flag"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	api "github.com/alanchchen/grpc-lb-istio/api"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
+	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
-
-var (
-	host   string
-	port   int
-	repeat int
-)
-
-func init() {
-	flag.StringVar(&host, "host", "127.0.0.1", "The server host")
-	flag.IntVar(&port, "port", 7000, "The server port")
-	flag.IntVar(&repeat, "repeat", 1, "Times to call server")
-	flag.Parse()
-}
 
 func main() {
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", host, port),
-		grpc.WithInsecure(),
-	)
+
+	// Create Consumer instance
+	c, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": "127.0.0.1:9092",
+		// "sasl.mechanisms":   "GSSAPI",
+		"security.protocol": "PLAINTEXT",
+		"sasl.username":     "principal",
+		"sasl.password":     "principal",
+		"sasl.mechanisms":   "PLAIN",
+		// "ssl.ca.location":   "/Users/jay/dev/jay-play-go/cacert.pem",
+		"group.id": "jay-test",
+		// "auto.offset.reset": "earliest",
+	})
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		fmt.Printf("Failed to create consumer: %s", err)
+		os.Exit(1)
 	}
-	defer conn.Close()
-	c := api.NewIdentityClient(conn)
 
-	ctx := metadata.NewOutgoingContext(context.Background(), metadata.New(map[string]string{
-		"Content-Type": "application/grpc",
-	}))
+	// Subscribe to topic
+	err = c.SubscribeTopics([]string{"myTopic"}, nil)
+	// Set up a channel for handling Ctrl-C, etc
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
-	for i := 0; i < repeat; i++ {
-		r, err := c.Who(ctx, &api.WhoRequest{})
-		if err != nil {
-			log.Printf("%v\n", err)
-			continue
+	// Process messages
+	run := true
+	for run == true {
+		select {
+		case sig := <-sigchan:
+			fmt.Printf("Caught signal %v: terminating\n", sig)
+			run = false
+		default:
+			msg, err := c.ReadMessage(100 * time.Millisecond)
+			if err != nil {
+				// Errors are informational and automatically handled by the consumer
+				continue
+			}
+			recordValue := msg.Value
+			log.Printf("value -> %s", recordValue)
 		}
-		log.Printf("%s\n", r.Name)
 	}
+
+	fmt.Printf("Closing consumer\n")
+	c.Close()
+
 }
