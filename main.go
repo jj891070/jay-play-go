@@ -1,54 +1,118 @@
 package main
 
 import (
-	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"flag"
 	"fmt"
-	"strings"
-	"time"
+	"io"
+	"log"
+	"os"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 )
 
-var way map[int]string
-
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
-
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
-	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
-}
-
 func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
-
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
 	}
+
+	/**
+	./app -n ubuntu -s 1.7.8 -d jay
+	*/
+	var imageName, sourceImageTag, addImageTag string
+	flag.StringVar(&imageName, "n", "", "input image name. ex: ubuntu")
+	flag.StringVar(&sourceImageTag, "s", "", "input source image tag name. ex: 1.7.8")
+	flag.StringVar(&addImageTag, "d", "", "input add image tag name. ex: jay")
+	flag.Parse()
+	if imageName == "" || sourceImageTag == "" || addImageTag == "" {
+		log.Fatalln("Please Input 'image name' and 'source image tag' and 'destination image tag'")
+	}
+
+	// _json_key
+	username := os.Getenv("IMAGE_USERNAME")
+	if username == "" {
+		log.Fatalln("Please Input Env 'IMAGE_USERNAME'")
+	}
+	// gcp iam json file
+	password := os.Getenv("IMAGE_PASSWORD")
+	if password == "" {
+		log.Fatalln("Please Input Env 'IMAGE_PASSWORD'")
+	}
+
+	authConfig := types.AuthConfig{
+		Username: username,
+		Password: password,
+	}
+
+	encodedJSON, err := json.Marshal(authConfig)
+	if err != nil {
+		log.Fatalln(fmt.Errorf("error when encoding authConfig. err: %v", err))
+	}
+
+	pullTarget := imageName + ":" + sourceImageTag
+	pushNewTarget := imageName + ":" + addImageTag
+	reader, err := cli.ImagePull(
+		ctx,
+		pullTarget,
+		types.ImagePullOptions{
+			RegistryAuth: base64.URLEncoding.EncodeToString(encodedJSON),
+		})
+	if err != nil {
+		log.Fatalln(fmt.Errorf("error when pull image. err: %v", err))
+	}
+	io.Copy(os.Stdout, reader)
+
+	err = cli.ImageTag(
+		ctx,
+		pullTarget,
+		pushNewTarget,
+	)
+	if err != nil {
+		log.Fatalln(fmt.Errorf("error when tag image. err: %v", err))
+	}
+
+	reader, err = cli.ImagePush(
+		ctx,
+		pushNewTarget,
+		types.ImagePushOptions{
+			RegistryAuth: base64.URLEncoding.EncodeToString(encodedJSON),
+		},
+	)
+	if err != nil {
+		log.Fatalln(fmt.Errorf("error when push image. err: %v", err))
+	}
+	io.Copy(os.Stdout, reader)
+	fmt.Println("---Finish---")
+	// resp, err := cli.ContainerCreate(ctx, &container.Config{
+	// 	Image: "asia.gcr.io/ag-ocean-registry/jay/golang",
+	// 	Cmd:   []string{"echo", "hello world"},
+	// }, nil, nil, nil, "")
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	// 	panic(err)
+	// }
+
+	// statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	// select {
+	// case err := <-errCh:
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// case <-statusCh:
+	// }
+
+	// out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// stdcopy.StdCopy(os.Stdout, os.Stderr, out)
 }
