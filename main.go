@@ -9,7 +9,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
@@ -29,17 +34,48 @@ func main() {
 	flag.StringVar(&sourceImageTag, "s", "", "input source image tag name. ex: 1.7.8")
 	flag.StringVar(&addImageTag, "d", "", "input add image tag name. ex: jay")
 	flag.Parse()
-	if imageName == "" || sourceImageTag == "" || addImageTag == "" {
-		log.Fatalln("Please Input 'image name' and 'source image tag' and 'destination image tag'")
+	if imageName == "" {
+		log.Fatalln("Please Input '-n [image_name]'")
+	}
+	if sourceImageTag == "" {
+		log.Fatalln("Please Input '-s [source_image_tag]'")
+	}
+	if addImageTag == "" {
+		log.Fatalln("Please Input '-d [destination_image_tag]'")
 	}
 
-	// _json_key
+	// _json_key,AWS
 	username := os.Getenv("IMAGE_USERNAME")
 	if username == "" {
 		log.Fatalln("Please Input Env 'IMAGE_USERNAME'")
 	}
+
 	// gcp iam json file
-	password := os.Getenv("IMAGE_PASSWORD")
+	var password string
+	switch username {
+	case "AWS":
+		if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
+			log.Fatalln("Please Input Env 'AWS_SECRET_ACCESS_KEY'")
+		}
+		if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
+			log.Fatalln("Please Input Env 'AWS_ACCESS_KEY_ID'")
+		}
+		if os.Getenv("AWS_ACCOUNT") == "" {
+			log.Fatalln("Please Input Env 'AWS_ACCOUNT'")
+		}
+		region := os.Getenv("AWS_REGION")
+		if region == "" {
+			region = "ap-east-1"
+		}
+
+		password, err = AwsGetToken(region)
+		if err != nil {
+			log.Fatalln(fmt.Errorf("aws login failed. err: %v", err))
+		}
+	default:
+		password = os.Getenv("IMAGE_PASSWORD")
+	}
+
 	if password == "" {
 		log.Fatalln("Please Input Env 'IMAGE_PASSWORD'")
 	}
@@ -88,31 +124,46 @@ func main() {
 	}
 	io.Copy(os.Stdout, reader)
 	fmt.Println("---Finish---")
-	// resp, err := cli.ContainerCreate(ctx, &container.Config{
-	// 	Image: "asia.gcr.io/ag-ocean-registry/jay/golang",
-	// 	Cmd:   []string{"echo", "hello world"},
-	// }, nil, nil, nil, "")
-	// if err != nil {
-	// 	panic(err)
-	// }
+}
 
-	// if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-	// 	panic(err)
-	// }
+func AwsGetToken(region string) (token string, err error) {
+	svc := ecr.New(
+		session.Must(session.NewSession()),
+		aws.NewConfig().WithRegion(region),
+	)
 
-	// statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	// select {
-	// case err := <-errCh:
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// case <-statusCh:
-	// }
+	input := &ecr.GetAuthorizationTokenInput{}
+	var result *ecr.GetAuthorizationTokenOutput
+	result, err = svc.GetAuthorizationToken(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case ecr.ErrCodeServerException:
+				err = fmt.Errorf("%v%v", ecr.ErrCodeServerException, aerr.Error())
+				// fmt.Println(ecr.ErrCodeServerException, aerr.Error())
+			case ecr.ErrCodeInvalidParameterException:
+				err = fmt.Errorf("%v%v", ecr.ErrCodeInvalidParameterException, aerr.Error())
+				// fmt.Println(ecr.ErrCodeInvalidParameterException, aerr.Error())
+			default:
+				err = fmt.Errorf("%v", aerr.Error())
+			}
+		}
+		return
+	}
 
-	// out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
-	// if err != nil {
-	// 	panic(err)
-	// }
+	if len(result.AuthorizationData) != 1 {
+		err = fmt.Errorf("token failed => %+v", result.AuthorizationData)
+		return
+	}
 
-	// stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+	var tmpUsernameANDToken []byte
+	tmpUsernameANDToken, err = base64.URLEncoding.DecodeString(*result.AuthorizationData[0].AuthorizationToken)
+	auth := strings.Split(string(tmpUsernameANDToken), ":")
+	if len(auth) != 2 {
+		err = fmt.Errorf("token failed => %+v", result.AuthorizationData)
+		return
+	}
+
+	token = auth[1]
+	return
 }
