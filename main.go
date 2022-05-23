@@ -29,10 +29,12 @@ func main() {
 	/**
 	./app -n ubuntu -s 1.7.8 -d jay
 	*/
-	var imageName, sourceImageTag, addImageTag string
+	var imageName, sourceImageTag, addImageTag, awsImageName string
 	flag.StringVar(&imageName, "n", "", "input image name. ex: ubuntu")
+	flag.StringVar(&awsImageName, "b", "", "input source image name(backup, now is aws). ex: 1.7.8")
 	flag.StringVar(&sourceImageTag, "s", "", "input source image tag name. ex: 1.7.8")
 	flag.StringVar(&addImageTag, "d", "", "input add image tag name. ex: jay")
+
 	flag.Parse()
 	if imageName == "" {
 		log.Fatalln("Please Input '-n [image_name]'")
@@ -50,10 +52,14 @@ func main() {
 		log.Fatalln("Please Input Env 'IMAGE_USERNAME'")
 	}
 
-	// gcp iam json file
-	var password string
-	switch username {
-	case "AWS":
+	password := os.Getenv("IMAGE_PASSWORD")
+	if password == "" {
+		log.Fatalln("Please Input Env 'IMAGE_PASSWORD'")
+	}
+
+	awsUsername := os.Getenv("AWS_IMAGE_USERNAME")
+	awsPassword := ""
+	if awsUsername == "AWS" {
 		if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
 			log.Fatalln("Please Input Env 'AWS_SECRET_ACCESS_KEY'")
 		}
@@ -63,29 +69,24 @@ func main() {
 		if os.Getenv("AWS_ACCOUNT") == "" {
 			log.Fatalln("Please Input Env 'AWS_ACCOUNT'")
 		}
+		if awsImageName == "" {
+			log.Fatalln("Please Input '-n [aws_image_name]'")
+		}
 		region := os.Getenv("AWS_REGION")
 		if region == "" {
 			region = "ap-east-1"
 		}
 
-		password, err = AwsGetToken(region)
+		awsPassword, err = AwsGetToken(region)
 		if err != nil {
 			log.Fatalln(fmt.Errorf("aws login failed. err: %v", err))
 		}
-	default:
-		password = os.Getenv("IMAGE_PASSWORD")
+		fmt.Println("---aws backup start---")
+
 	}
 
-	if password == "" {
-		log.Fatalln("Please Input Env 'IMAGE_PASSWORD'")
-	}
-
-	authConfig := types.AuthConfig{
-		Username: username,
-		Password: password,
-	}
-
-	encodedJSON, err := json.Marshal(authConfig)
+	var gcpAuth string
+	gcpAuth, err = AuthEncode(username, password)
 	if err != nil {
 		log.Fatalln(fmt.Errorf("error when encoding authConfig. err: %v", err))
 	}
@@ -96,12 +97,12 @@ func main() {
 		ctx,
 		pullTarget,
 		types.ImagePullOptions{
-			RegistryAuth: base64.URLEncoding.EncodeToString(encodedJSON),
+			RegistryAuth: gcpAuth,
 		})
 	if err != nil {
 		log.Fatalln(fmt.Errorf("error when pull image. err: %v", err))
 	}
-	io.Copy(os.Stdout, reader)
+	SeeUnauthorizedError(reader)
 
 	err = cli.ImageTag(
 		ctx,
@@ -116,14 +117,80 @@ func main() {
 		ctx,
 		pushNewTarget,
 		types.ImagePushOptions{
-			RegistryAuth: base64.URLEncoding.EncodeToString(encodedJSON),
+			RegistryAuth: gcpAuth,
 		},
 	)
 	if err != nil {
 		log.Fatalln(fmt.Errorf("error when push image. err: %v", err))
 	}
-	io.Copy(os.Stdout, reader)
+	SeeUnauthorizedError(reader)
+
+	if awsUsername == "AWS" {
+		var awsAuth string
+		awsAuth, err = AuthEncode(awsUsername, awsPassword)
+		if err != nil {
+			log.Fatalln(fmt.Errorf("error when encoding authConfig. err: %v", err))
+		}
+
+		pushAwsOldTarget := awsImageName + ":" + sourceImageTag
+		pushAwsNewTarget := awsImageName + ":" + addImageTag
+		err = cli.ImageTag(
+			ctx,
+			pullTarget,
+			pushAwsOldTarget,
+		)
+		if err != nil {
+			log.Fatalln(fmt.Errorf("error when tag image. err: %v", err))
+		}
+		err = cli.ImageTag(
+			ctx,
+			pullTarget,
+			pushAwsNewTarget,
+		)
+		if err != nil {
+			log.Fatalln(fmt.Errorf("error when tag image. err: %v", err))
+		}
+
+		reader, err = cli.ImagePush(
+			ctx,
+			pushAwsNewTarget,
+			types.ImagePushOptions{
+				RegistryAuth: awsAuth,
+			},
+		)
+		if err != nil {
+			log.Fatalln(fmt.Errorf("error when push image. err: %v", err))
+		}
+
+		SeeUnauthorizedError(reader)
+
+		reader, err = cli.ImagePush(
+			ctx,
+			pushAwsOldTarget,
+			types.ImagePushOptions{
+				RegistryAuth: awsAuth,
+			},
+		)
+		if err != nil {
+			log.Fatalln(fmt.Errorf("error when push image. err: %v", err))
+		}
+
+		SeeUnauthorizedError(reader)
+	}
 	fmt.Println("---Finish---")
+}
+
+func AuthEncode(username, password string) (reulst string, err error) {
+	authConfig := types.AuthConfig{
+		Username: username,
+		Password: password,
+	}
+	authConfigJSON, err := json.Marshal(authConfig)
+	if err != nil {
+		return
+	}
+	reulst = base64.URLEncoding.EncodeToString(authConfigJSON)
+	return
 }
 
 func AwsGetToken(region string) (token string, err error) {
@@ -166,4 +233,13 @@ func AwsGetToken(region string) (token string, err error) {
 
 	token = auth[1]
 	return
+}
+
+func SeeUnauthorizedError(reader io.ReadCloser) {
+	buf := new(strings.Builder)
+	io.Copy(buf, reader)
+	fmt.Println(buf.String())
+	if strings.Contains(buf.String(), "unauthorized") {
+		log.Fatalln("unauthorized")
+	}
 }
