@@ -1,0 +1,39 @@
+version: "3"
+
+services:
+  # 時序資料庫
+  influxdb:
+    image: influxdb:2.0
+    ports:
+      - 8086:8086
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_ORG=agocean
+      - DOCKER_INFLUXDB_INIT_BUCKET=jay-test
+      - DOCKER_INFLUXDB_INIT_USERNAME=root
+      - DOCKER_INFLUXDB_INIT_PASSWORD=qwe123456
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=qwe123
+      # - INFLUXDB_DB=ai
+      # - INFLUXDB_ADMIN_USER=root
+      # - INFLUXDB_ADMIN_PASSWORD=qwe123
+      # - INFLUXDB_HTTP_FLUX_ENABLED=true
+      # - INFLUXDB_HTTP_FLUX_ENABLED=true
+
+  # 時序資料庫介面
+  chronograf:
+    image: chronograf:1.9-alpine
+    ports:
+      - 8088:8888
+    # volumes:
+    #   - chronograf:/var/lib/chronograf
+    depends_on:
+      - influxdb
+    # command: [ "chronograf", "--influxdb-url=http://influxdb:8086"]
+    environment:
+      - INFLUXDB_URL=
+      - INFLUXDB_USERNAME=root
+      - INFLUXDB_PASSWORD=qwe123456
+
+volumes:
+  influxdb:
+  # chronograf:

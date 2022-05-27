@@ -1,54 +1,89 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
-	"strings"
+	"io/ioutil"
+	"math/rand"
+	"net/http"
+	"sync"
 	"time"
+
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 )
 
-var way map[int]string
+func main() {
+	// You can generate a Token from the "Tokens Tab" in the UI
+	const token = "qwe123"
+	const bucket = "jay-test"
+	const org = "agocean"
 
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
+	client := influxdb2.NewClient("http://127.0.0.1:8086", token)
+	// Get non-blocking write client
+	writeAPI := client.WriteAPI(org, bucket)
 
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
+	poolNum := 10
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConns = poolNum
+	transport.MaxConnsPerHost = poolNum
+	transport.MaxIdleConnsPerHost = poolNum
+	apiclient := http.Client{
+		// Timeout:   30 * time.Second,
+		Transport: transport,
 	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
+
+	// write some points
+	for i := 0; i < 100; i++ {
+		code, _, _ := HTTPGet(
+			apiclient,
+			"https://agapi.bravocasino.net/healthz", nil,
+		)
+
+		// create point
+		p := influxdb2.NewPoint(
+			"sc-api",
+			map[string]string{
+				"hostname": "health-api",
+			},
+			map[string]interface{}{
+				"status":  code,
+				"resTime": rand.Float64() * 300.0,
+			},
+			time.Now())
+		// write asynchronously
+		writeAPI.WritePoint(p)
 	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
+	// Force all unwritten data to be sent
+	writeAPI.Flush()
+	// always close client at the end
+	defer client.Close()
 }
 
-func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
-
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+func HTTPGet(
+	client http.Client,
+	url string, wg *sync.WaitGroup,
+) (statusCode int, body string, err error) {
+	//发送请求获取响应
+	resp, err := client.Get(url)
+	if err != nil {
+		return
 	}
+	//结束网络释放资源
+	if resp != nil {
+		defer func() {
+			resp.Body.Close()
+			if wg != nil {
+				wg.Done()
+			}
+		}()
+	}
+	//判断响应状态码
+	statusCode = resp.StatusCode
+
+	//读取响应实体
+	bs, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	body = string(bs)
+	return
 }
