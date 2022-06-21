@@ -1,0 +1,31 @@
+# http routing section
+http:
+  routers:
+    # Define a connection between requests and services
+    to-whoami:
+      rule:
+        "PathPrefix(`/`)"
+        # If the rule matches, applies the middleware
+      # middlewares:
+      #   - test-user
+      # If the rule matches, forward to the whoami service (declared below)
+      service: whoami
+    api:
+      rule: "PathPrefix(`/`)"
+      service: api@internal
+      entryPoints:
+        - internal
+
+  middlewares:
+    # Define an authentication mechanism
+    test-user:
+      basicAuth:
+        users:
+          - test:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/
+
+  services:
+    # Define how to reach an existing service on our infrastructure
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://10.7.0.2:31353
