@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  reverse-proxy:
+    image: envoyproxy/envoy:v1.20.5
+    ports:
+      # The HTTP port
+      - "80:80"
+      - "8001:8001"
+    volumes:
+      - $PWD/conf/:/etc/envoy/
+      # - $PWD/conf2/:/var/lib/envoy/
+    command:
+      - -c /etc/envoy/envoy.yaml
+      # - --component-log-level upstream:debug,connection:trace
+      - --component-log-level connection:trace
