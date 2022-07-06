@@ -1,0 +1,29 @@
+resources:
+  - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+    name: jay-server
+    connect_timeout: 30s
+    # preconnect_policy: {}
+    connection_pool_per_downstream_connection: true
+    health_checks:
+      - timeout: 1s
+        interval: 0.25s
+        unhealthy_threshold: 5
+        healthy_threshold: 2
+        http_health_check:
+          path: "/"
+          expected_statuses:
+            - start: 200
+              end: 299
+    upstream_connection_options:
+      tcp_keepalive: {}
+    lb_policy: round_robin
+    type: strict_dns
+    load_assignment:
+      cluster_name: jay-server
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: nginx
+                    port_value: 80
