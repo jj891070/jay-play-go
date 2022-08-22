@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  reverse-proxy:
+    image: haproxy:2.6-alpine
+    ports:
+      # The HTTP port
+      - "80:80"
+    volumes:
+      - $PWD/conf/:/usr/local/etc/haproxy/
+    # command:
+    #   - -c /etc/envoy/envoy.yaml
