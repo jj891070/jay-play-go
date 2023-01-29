@@ -36,6 +36,11 @@ func main() {
 	num := 1
 	// for i := 0; i < n; i++ {
 	bounds := screenshot.GetDisplayBounds(num)
+	// 	Large: Display as 1000 x 1000 image
+	// Medium: Display as a 600 x 600 image
+	// Small: Display as a 200 x 200 image
+	// Tiny: Display as a 50 x 50 image
+	// Text: Display as a URL
 	bounds.Min.X = 100
 	bounds.Max.X = 200
 	bounds.Min.Y = 100
