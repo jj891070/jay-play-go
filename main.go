@@ -1,54 +1,40 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
-	"time"
+	"log"
+	"net"
+	"net/http"
+	"os"
 )
 
-var way map[int]string
-
-func benchmarkStringFunction(n int, index int) (d time.Duration) {
-	v := "ni shuo wo shi bu shi tai wu liao le a?"
-	var s string
-	var buf bytes.Buffer
-
-	t0 := time.Now()
-	for i := 0; i < n; i++ {
-		switch index {
-		case 0: // fmt.Sprintf
-			s = fmt.Sprintf("%s[%s]", s, v)
-		case 1: // string +
-			s = s + "[" + v + "]"
-		case 2: // strings.Join
-			s = strings.Join([]string{s, "[", v, "]"}, "")
-		case 3: // stable bytes.Buffer
-			buf.WriteString("[")
-			buf.WriteString(v)
-			buf.WriteString("]")
-		}
-
-	}
-	d = time.Since(t0)
-	if index == 3 {
-		s = buf.String()
-	}
-	fmt.Printf("string len: %d\t", len(s))
-	fmt.Printf("time of [%s]=\t %v\n", way[index], d)
-	return d
-}
+const socketPath = "/tmp/my_unix_socket"
 
 func main() {
-	way = make(map[int]string, 5)
-	way[0] = "fmt.Sprintf"
-	way[1] = "+"
-	way[2] = "strings.Join"
-	way[3] = "bytes.Buffer"
+	// 删除之前可能残留的套接字文件
+	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+		fmt.Println("无法删除套接字文件:", err)
+		return
+	}
 
-	k := 4
-	d := [5]time.Duration{}
-	for i := 0; i < k; i++ {
-		d[i] = benchmarkStringFunction(10000, i)
+	serverMux := http.NewServeMux()
+	serverMux.Handle("/", http.FileServer(http.Dir("html")))
+	serverMux.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Hello golang network developer!"))
+	})
+
+	server := http.Server{Handler: serverMux}
+	// 创建Unix域套接字监听器
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		fmt.Println("无法创建监听器:", err)
+		return
+	}
+	defer listener.Close()
+	log.Println("開始監聽")
+
+	err = server.Serve(listener)
+	if err != nil {
+		panic(err)
 	}
 }
